@@ -1,0 +1,6 @@
+{
+  "name": "LinkSave",
+  "description": "Aplikasi Android untuk mengunduh video YouTube, TikTok, dan Instagram hanya dengan menempelkan tautan.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

@@ -1,0 +1,53 @@
+<resources>
+    <string name="app_name">LinkSave</string>
+    <string name="tagline">Simpan Video dari Tautan</string>
+    <string name="nav_home">Unduh</string>
+    <string name="nav_downloads">Riwayat</string>
+
+    <string name="hero_title">Unduh Video Cepat Hanya dari Link</string>
+    <string name="hero_subtitle">Tempel tautan YouTube, TikTok, atau Instagram untuk memilih kualitas dan menyimpannya langsung ke perangkat.</string>
+
+    <string name="url_input_label">Tautan Video</string>
+    <string name="url_input_placeholder">Tempel link YouTube, TikTok, atau IG…</string>
+    <string name="btn_paste">Tempel</string>
+    <string name="btn_clear">Hapus</string>
+    <string name="btn_analyze">Analisis Tautan</string>
+    <string name="btn_analyzing">Menganalisis…</string>
+    <string name="btn_download_selected">Unduh Sekarang</string>
+    <string name="btn_cancel">Batal</string>
+    <string name="btn_retry">Coba Lagi</string>
+
+    <string name="platform_youtube">YouTube</string>
+    <string name="platform_tiktok">TikTok</string>
+    <string name="platform_instagram">Instagram</string>
+    <string name="platform_direct">Tautan Langsung</string>
+
+    <string name="choose_quality">Pilih Kualitas &amp; Format</string>
+    <string name="video_ready">Siap Diunduh</string>
+
+    <string name="downloads_title">Riwayat Unduhan</string>
+    <string name="filter_all">Semua</string>
+    <string name="empty_downloads_title">Belum Ada Video Tersimpan</string>
+    <string name="empty_downloads_subtitle">Tempel tautan YouTube, TikTok, atau Instagram di tab Unduh untuk mulai menyimpan video ke galeri.</string>
+
+    <string name="status_downloading">Mengunduh</string>
+    <string name="status_completed">Tersimpan</string>
+    <string name="status_failed">Gagal</string>
+    <string name="status_cancelled">Dibatalkan</string>
+    <string name="status_queued">Menunggu</string>
+
+    <string name="action_play">Putar</string>
+    <string name="action_open_external">Buka di Pemutar</string>
+    <string name="action_share">Bagikan</string>
+    <string name="action_delete">Hapus</string>
+    <string name="action_close">Tutup</string>
+
+    <string name="clipboard_empty">Clipboard kosong atau tidak berisi tautan.</string>
+    <string name="invalid_url">Masukkan tautan video yang valid (https://…).</string>
+    <string name="download_started">Mengunduh video ke perangkat…</string>
+    <string name="download_completed_msg">Berhasil disimpan ke Galeri / Unduhan.</string>
+    <string name="how_to_title">Cara Pakai</string>
+    <string name="how_to_step_1">Salin tautan video dari YouTube, TikTok, atau Instagram.</string>
+    <string name="how_to_step_2">Tempel di kolom tautan atau gunakan tombol Bagikan ke LinkSave.</string>
+    <string name="how_to_step_3">Pilih resolusi video atau audio lalu tekan Unduh.</string>
+</resources>
