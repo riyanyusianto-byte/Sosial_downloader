@@ -54,6 +54,7 @@ data class ExtractedMediaInfo(
 enum class DownloadStatus {
     QUEUED,
     DOWNLOADING,
+    PAUSED,
     COMPLETED,
     FAILED,
     CANCELLED

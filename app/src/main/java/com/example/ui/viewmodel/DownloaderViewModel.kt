@@ -196,12 +196,16 @@ class DownloaderViewModel(application: Application) : AndroidViewModel(applicati
         _selectedFilter.value = platform
     }
 
+    fun pauseDownload(id: Long) {
+        repository.pauseDownload(id)
+    }
+
     fun cancelDownload(id: Long) {
         repository.cancelDownload(id)
     }
 
     fun retryDownload(item: DownloadEntity) {
-        repository.retryDownload(item)
+        repository.resumeOrRetryDownload(item)
     }
 
     fun deleteDownload(item: DownloadEntity) {

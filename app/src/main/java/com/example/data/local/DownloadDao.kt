@@ -17,9 +17,13 @@ interface DownloadDao {
     @Query("SELECT * FROM downloads WHERE id = :id LIMIT 1")
     suspend fun getById(id: Long): DownloadEntity?
 
+    @Query("UPDATE downloads SET partialFilePath = :partialFilePath WHERE id = :id")
+    suspend fun updatePartialFilePath(id: Long, partialFilePath: String?)
+
     @Query(
         "UPDATE downloads SET status = :status, bytesDownloaded = :bytesDownloaded, " +
-            "totalBytes = :totalBytes, speedBytesPerSec = :speedBytesPerSec WHERE id = :id"
+            "totalBytes = :totalBytes, speedBytesPerSec = :speedBytesPerSec, " +
+            "errorMessage = NULL WHERE id = :id"
     )
     suspend fun updateProgress(
         id: Long,
@@ -30,7 +34,21 @@ interface DownloadDao {
     )
 
     @Query(
-        "UPDATE downloads SET status = :status, localUri = :localUri, " +
+        "UPDATE downloads SET downloadUrl = :downloadUrl, mimeType = :mimeType, " +
+            "qualityLabel = :qualityLabel, referer = :referer, userAgent = :userAgent, " +
+            "errorMessage = NULL WHERE id = :id"
+    )
+    suspend fun updateResolvedSource(
+        id: Long,
+        downloadUrl: String,
+        mimeType: String,
+        qualityLabel: String,
+        referer: String?,
+        userAgent: String?
+    )
+
+    @Query(
+        "UPDATE downloads SET status = :status, localUri = :localUri, partialFilePath = NULL, " +
             "bytesDownloaded = :bytesDownloaded, totalBytes = :totalBytes, " +
             "speedBytesPerSec = 0, errorMessage = NULL WHERE id = :id"
     )
@@ -43,12 +61,15 @@ interface DownloadDao {
     )
 
     @Query(
-        "UPDATE downloads SET status = :status, speedBytesPerSec = 0, " +
+        "UPDATE downloads SET status = :status, bytesDownloaded = :bytesDownloaded, " +
+            "totalBytes = :totalBytes, speedBytesPerSec = 0, " +
             "errorMessage = :errorMessage WHERE id = :id"
     )
-    suspend fun markFailedOrCancelled(
+    suspend fun markStopped(
         id: Long,
         status: String,
+        bytesDownloaded: Long,
+        totalBytes: Long,
         errorMessage: String?
     )
 

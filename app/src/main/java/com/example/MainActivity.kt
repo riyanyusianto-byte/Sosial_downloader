@@ -386,8 +386,9 @@ private fun LinkSaveApp(
                                 }
                             },
                             onShareItem = onShareMedia,
+                            onPauseItem = viewModel::pauseDownload,
                             onCancelItem = viewModel::cancelDownload,
-                            onRetryItem = viewModel::retryDownload,
+                            onResumeOrRetryItem = viewModel::retryDownload,
                             onDeleteItem = viewModel::deleteDownload,
                             onClearHistory = viewModel::clearCompletedHistory,
                             onGoToHome = { navigateTo(ROUTE_HOME) }

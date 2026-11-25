@@ -19,6 +19,7 @@ data class DownloadEntity(
     val fileName: String,
     val thumbnailUrl: String?,
     val localUri: String?,
+    val partialFilePath: String? = null,
     val status: String,
     val bytesDownloaded: Long = 0L,
     val totalBytes: Long = -1L,

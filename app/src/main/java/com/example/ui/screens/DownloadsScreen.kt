@@ -31,10 +31,13 @@ import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.DeleteOutline
 import androidx.compose.material.icons.rounded.DeleteSweep
 import androidx.compose.material.icons.rounded.ErrorOutline
+import androidx.compose.material.icons.rounded.Pause
+import androidx.compose.material.icons.rounded.PauseCircleOutline
 import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material.icons.rounded.Share
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.FilterChip
@@ -67,6 +70,7 @@ import com.example.data.model.DownloadStatus
 import com.example.data.model.MediaPlatform
 import com.example.ui.components.PlatformBadge
 import com.example.ui.components.brandColor
+import com.example.ui.theme.AmberAccent
 import com.example.ui.theme.SuccessEmerald
 import com.example.ui.util.formatFileSize
 import com.example.ui.util.formatSpeed
@@ -78,8 +82,9 @@ fun DownloadsScreen(
     onFilterSelected: (MediaPlatform?) -> Unit,
     onPlayItem: (DownloadEntity) -> Unit,
     onShareItem: (DownloadEntity) -> Unit,
+    onPauseItem: (Long) -> Unit,
     onCancelItem: (Long) -> Unit,
-    onRetryItem: (DownloadEntity) -> Unit,
+    onResumeOrRetryItem: (DownloadEntity) -> Unit,
     onDeleteItem: (DownloadEntity) -> Unit,
     onClearHistory: () -> Unit,
     onGoToHome: () -> Unit,
@@ -174,8 +179,9 @@ fun DownloadsScreen(
                             item = item,
                             onPlay = { onPlayItem(item) },
                             onShare = { onShareItem(item) },
+                            onPause = { onPauseItem(item.id) },
                             onCancel = { onCancelItem(item.id) },
-                            onRetry = { onRetryItem(item) },
+                            onResumeOrRetry = { onResumeOrRetryItem(item) },
                             onDelete = { onDeleteItem(item) }
                         )
                     }
@@ -190,8 +196,9 @@ private fun DownloadItemCard(
     item: DownloadEntity,
     onPlay: () -> Unit,
     onShare: () -> Unit,
+    onPause: () -> Unit,
     onCancel: () -> Unit,
-    onRetry: () -> Unit,
+    onResumeOrRetry: () -> Unit,
     onDelete: () -> Unit
 ) {
     val platform = item.platformEnum()
@@ -340,7 +347,9 @@ private fun DownloadItemCard(
                         val downloadedTxt = formatFileSize(item.bytesDownloaded).ifEmpty { "0 KB" }
                         val totalTxt = formatFileSize(item.totalBytes)
                         val speedTxt = formatSpeed(item.speedBytesPerSec)
+                        val pctTxt = progress?.let { "${(it * 100).toInt()}%" }
                         val statusLine = buildString {
+                            if (!pctTxt.isNullOrEmpty()) append("$pctTxt • ")
                             append(downloadedTxt)
                             if (totalTxt.isNotEmpty()) append(" / $totalTxt")
                             if (speedTxt.isNotEmpty()) append(" • $speedTxt")
@@ -348,17 +357,30 @@ private fun DownloadItemCard(
                         Text(
                             text = statusLine,
                             style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.weight(1f)
                         )
-                        IconButton(
-                            onClick = onCancel,
-                            modifier = Modifier.testTag("cancel_button_${item.id}")
-                        ) {
-                            Icon(
-                                imageVector = Icons.Rounded.Close,
-                                contentDescription = stringResource(R.string.btn_cancel),
-                                tint = MaterialTheme.colorScheme.error
-                            )
+                        Row {
+                            IconButton(
+                                onClick = onPause,
+                                modifier = Modifier.testTag("pause_button_${item.id}")
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Rounded.Pause,
+                                    contentDescription = stringResource(R.string.btn_pause),
+                                    tint = AmberAccent
+                                )
+                            }
+                            IconButton(
+                                onClick = onCancel,
+                                modifier = Modifier.testTag("cancel_button_${item.id}")
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Rounded.Close,
+                                    contentDescription = stringResource(R.string.btn_cancel),
+                                    tint = MaterialTheme.colorScheme.error
+                                )
+                            }
                         }
                     }
                 }
@@ -425,7 +447,31 @@ private fun DownloadItemCard(
                     }
                 }
 
-                DownloadStatus.FAILED, DownloadStatus.CANCELLED -> {
+                DownloadStatus.PAUSED, DownloadStatus.FAILED, DownloadStatus.CANCELLED -> {
+                    val hasSavedBytes = item.bytesDownloaded > 0L
+                    val progress = if (hasSavedBytes && item.totalBytes > 0L) {
+                        (item.bytesDownloaded.toFloat() / item.totalBytes.toFloat()).coerceIn(0f, 1f)
+                    } else {
+                        null
+                    }
+                    if (hasSavedBytes) {
+                        if (progress != null) {
+                            LinearProgressIndicator(
+                                progress = { progress },
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(5.dp)
+                                    .clip(RoundedCornerShape(50)),
+                                color = if (status == DownloadStatus.PAUSED) {
+                                    AmberAccent
+                                } else {
+                                    MaterialTheme.colorScheme.error
+                                }
+                            )
+                        }
+                        Spacer(modifier = Modifier.height(6.dp))
+                    }
+
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween,
@@ -437,28 +483,75 @@ private fun DownloadItemCard(
                             horizontalArrangement = Arrangement.spacedBy(6.dp)
                         ) {
                             Icon(
-                                imageVector = Icons.Rounded.ErrorOutline,
+                                imageVector = if (status == DownloadStatus.PAUSED) {
+                                    Icons.Rounded.PauseCircleOutline
+                                } else {
+                                    Icons.Rounded.ErrorOutline
+                                },
                                 contentDescription = null,
-                                tint = MaterialTheme.colorScheme.error,
+                                tint = if (status == DownloadStatus.PAUSED) {
+                                    AmberAccent
+                                } else {
+                                    MaterialTheme.colorScheme.error
+                                },
                                 modifier = Modifier.size(16.dp)
                             )
+                            val savedText = formatFileSize(item.bytesDownloaded)
+                            val totalText = formatFileSize(item.totalBytes)
+                            val labelText = when {
+                                status == DownloadStatus.PAUSED && hasSavedBytes -> {
+                                    val pct = progress?.let { " (${(it * 100).toInt()}%)" }.orEmpty()
+                                    "Dijeda$pct • $savedText${if (totalText.isNotEmpty()) " / $totalText" else ""}"
+                                }
+                                hasSavedBytes -> {
+                                    val pct = progress?.let { "${(it * 100).toInt()}% • " }.orEmpty()
+                                    "${pct}Tersimpan $savedText • ${item.errorMessage ?: "Gagal"}"
+                                }
+                                else -> item.errorMessage ?: stringResource(R.string.status_failed)
+                            }
                             Text(
-                                text = item.errorMessage ?: stringResource(R.string.status_failed),
+                                text = labelText,
                                 style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.error,
+                                color = if (status == DownloadStatus.PAUSED) {
+                                    AmberAccent
+                                } else {
+                                    MaterialTheme.colorScheme.error
+                                },
                                 maxLines = 2,
                                 overflow = TextOverflow.Ellipsis
                             )
                         }
-                        Row {
-                            IconButton(
-                                onClick = onRetry,
-                                modifier = Modifier.testTag("retry_button_${item.id}")
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Button(
+                                onClick = onResumeOrRetry,
+                                shape = RoundedCornerShape(10.dp),
+                                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = MaterialTheme.colorScheme.primary,
+                                    contentColor = MaterialTheme.colorScheme.onPrimary
+                                ),
+                                modifier = Modifier
+                                    .height(40.dp)
+                                    .testTag("resume_button_${item.id}")
                             ) {
                                 Icon(
-                                    imageVector = Icons.Rounded.Refresh,
-                                    contentDescription = stringResource(R.string.btn_retry),
-                                    tint = MaterialTheme.colorScheme.primary
+                                    imageVector = if (hasSavedBytes) {
+                                        Icons.Rounded.PlayArrow
+                                    } else {
+                                        Icons.Rounded.Refresh
+                                    },
+                                    contentDescription = null,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text(
+                                    text = if (hasSavedBytes || status == DownloadStatus.PAUSED) {
+                                        stringResource(R.string.btn_resume)
+                                    } else {
+                                        stringResource(R.string.btn_retry)
+                                    },
+                                    style = MaterialTheme.typography.labelMedium
                                 )
                             }
                             IconButton(

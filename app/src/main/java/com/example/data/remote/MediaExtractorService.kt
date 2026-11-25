@@ -3,6 +3,8 @@ package com.example.data.remote
 import com.example.data.model.ExtractedMediaInfo
 import com.example.data.model.MediaPlatform
 import com.example.data.model.VideoFormatOption
+import java.net.InetAddress
+import java.net.URI
 import java.net.URLEncoder
 import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.Dispatchers
@@ -32,6 +34,14 @@ class MediaExtractorService {
         .connectTimeout(6, TimeUnit.SECONDS)
         .readTimeout(8, TimeUnit.SECONDS)
         .build()
+
+    fun isHostResolvable(url: String): Boolean {
+        val host = runCatching { URI(url).host }.getOrNull() ?: return false
+        if (host.isBlank()) return false
+        return runCatching {
+            InetAddress.getAllByName(host).isNotEmpty()
+        }.getOrDefault(false)
+    }
 
     suspend fun extractMedia(rawInput: String): Result<ExtractedMediaInfo> = withContext(Dispatchers.IO) {
         val extractedUrl = MediaPlatform.extractFirstUrl(rawInput)
@@ -143,7 +153,7 @@ class MediaExtractorService {
             val sdSize = data.optLong("size", -1L).takeIf { it > 0 }
             val wmSize = data.optLong("wm_size", -1L).takeIf { it > 0 }
 
-            if (!hdPlay.isNullOrBlank()) {
+            if (!hdPlay.isNullOrBlank() && isHostResolvable(hdPlay)) {
                 formats += VideoFormatOption(
                     id = "tt_hd",
                     label = "MP4 HD (Tanpa Watermark)",
@@ -156,7 +166,7 @@ class MediaExtractorService {
                     userAgent = DESKTOP_UA
                 )
             }
-            if (!sdPlay.isNullOrBlank() && sdPlay != hdPlay) {
+            if (!sdPlay.isNullOrBlank() && sdPlay != hdPlay && isHostResolvable(sdPlay)) {
                 formats += VideoFormatOption(
                     id = "tt_sd",
                     label = "MP4 Standar (Tanpa Watermark)",
@@ -169,7 +179,7 @@ class MediaExtractorService {
                     userAgent = DESKTOP_UA
                 )
             }
-            if (!wmPlay.isNullOrBlank() && wmPlay != sdPlay) {
+            if (!wmPlay.isNullOrBlank() && wmPlay != sdPlay && isHostResolvable(wmPlay)) {
                 formats += VideoFormatOption(
                     id = "tt_wm",
                     label = "MP4 (Dengan Watermark)",
@@ -182,7 +192,7 @@ class MediaExtractorService {
                     userAgent = DESKTOP_UA
                 )
             }
-            if (!musicUrl.isNullOrBlank()) {
+            if (!musicUrl.isNullOrBlank() && isHostResolvable(musicUrl)) {
                 formats += VideoFormatOption(
                     id = "tt_audio",
                     label = "Audio Musik (MP3)",
@@ -247,7 +257,7 @@ class MediaExtractorService {
             val downloadAddr = videoObj.optString("downloadAddr")
 
             val formats = mutableListOf<VideoFormatOption>()
-            if (playAddr.startsWith("http")) {
+            if (playAddr.startsWith("http") && isHostResolvable(playAddr)) {
                 formats += VideoFormatOption(
                     id = "tt_html_play",
                     label = "MP4 Video",
@@ -259,7 +269,7 @@ class MediaExtractorService {
                     userAgent = DESKTOP_UA
                 )
             }
-            if (downloadAddr.startsWith("http") && downloadAddr != playAddr) {
+            if (downloadAddr.startsWith("http") && downloadAddr != playAddr && isHostResolvable(downloadAddr)) {
                 formats += VideoFormatOption(
                     id = "tt_html_dl",
                     label = "MP4 Unduhan Asli",
@@ -296,22 +306,6 @@ class MediaExtractorService {
         val visitorData = embedSession?.visitorData
 
         val clients = buildList {
-            // TVHTML5_SIMPLY_EMBEDDED_PLAYER often works even without login and works great with auth
-            add(
-                InnertubeClientConfig(
-                    clientName = "TVHTML5_SIMPLY_EMBEDDED_PLAYER",
-                    clientVersion = "2.0",
-                    clientIdNum = "85",
-                    userAgent = "Mozilla/5.0 (ChromiumStylePlatform) Cobalt/Version",
-                    deviceMake = null,
-                    deviceModel = null,
-                    osName = null,
-                    osVersion = null,
-                    androidSdkVersion = null,
-                    isEmbedded = true,
-                    supportsAuth = true
-                )
-            )
             if (sapisidAuth != null) {
                 add(
                     InnertubeClientConfig(
@@ -325,6 +319,7 @@ class MediaExtractorService {
                         osVersion = "14",
                         androidSdkVersion = null,
                         isEmbedded = false,
+                        isWebClient = true,
                         supportsAuth = true
                     )
                 )
@@ -341,6 +336,23 @@ class MediaExtractorService {
                     osVersion = "14",
                     androidSdkVersion = 34,
                     isEmbedded = false,
+                    isWebClient = false,
+                    supportsAuth = false
+                )
+            )
+            add(
+                InnertubeClientConfig(
+                    clientName = "ANDROID_TESTSUITE",
+                    clientVersion = "1.9",
+                    clientIdNum = "30",
+                    userAgent = "com.google.android.youtube/1.9 (Linux; U; Android 14; en_US)",
+                    deviceMake = "Google",
+                    deviceModel = "Pixel 8",
+                    osName = "Android",
+                    osVersion = "14",
+                    androidSdkVersion = 34,
+                    isEmbedded = false,
+                    isWebClient = false,
                     supportsAuth = false
                 )
             )
@@ -356,7 +368,24 @@ class MediaExtractorService {
                     osVersion = "18.1.0.22B83",
                     androidSdkVersion = null,
                     isEmbedded = false,
+                    isWebClient = false,
                     supportsAuth = false
+                )
+            )
+            add(
+                InnertubeClientConfig(
+                    clientName = "TVHTML5_SIMPLY_EMBEDDED_PLAYER",
+                    clientVersion = "2.0",
+                    clientIdNum = "85",
+                    userAgent = "Mozilla/5.0 (ChromiumStylePlatform) Cobalt/Version",
+                    deviceMake = null,
+                    deviceModel = null,
+                    osName = null,
+                    osVersion = null,
+                    androidSdkVersion = null,
+                    isEmbedded = true,
+                    isWebClient = true,
+                    supportsAuth = true
                 )
             )
         }
@@ -386,27 +415,28 @@ class MediaExtractorService {
             err?.message?.let { lastError = it }
         }
 
-        // Fallback to public Piped & Invidious mirrors
-        val pipedInstances = listOf(
-            "https://pipedapi.kavin.rocks",
-            "https://api.piped.private.coffee",
-            "https://pipedapi.adminforge.de"
-        )
-        for (instance in pipedInstances) {
-            val piped = runCatching { fetchFromPiped(url, videoId, instance) }.getOrNull()
-            if (piped != null && piped.formats.isNotEmpty()) {
-                return piped
-            }
-        }
-
+        // Fallback to Invidious and Piped mirrors — validating DNS reachability of returned stream hosts
         val invidiousInstances = listOf(
             "https://inv.nadeko.net",
-            "https://iv.datura.network"
+            "https://iv.datura.network",
+            "https://invidious.nerdvpn.de"
         )
         for (instance in invidiousInstances) {
             val invidious = runCatching { fetchFromInvidious(url, videoId, instance) }.getOrNull()
             if (invidious != null && invidious.formats.isNotEmpty()) {
                 return invidious
+            }
+        }
+
+        val pipedInstances = listOf(
+            "https://pipedapi.kavin.rocks",
+            "https://pipedapi.adminforge.de",
+            "https://api.piped.private.coffee"
+        )
+        for (instance in pipedInstances) {
+            val piped = runCatching { fetchFromPiped(url, videoId, instance) }.getOrNull()
+            if (piped != null && piped.formats.isNotEmpty()) {
+                return piped
             }
         }
 
@@ -464,6 +494,7 @@ class MediaExtractorService {
         val osVersion: String?,
         val androidSdkVersion: Int?,
         val isEmbedded: Boolean,
+        val isWebClient: Boolean,
         val supportsAuth: Boolean
     )
 
@@ -509,10 +540,12 @@ class MediaExtractorService {
             .header("Content-Type", "application/json")
             .header("X-YouTube-Client-Name", cfg.clientIdNum)
             .header("X-YouTube-Client-Version", cfg.clientVersion)
-            .header("Origin", "https://www.youtube.com")
-            .header("Referer", "https://www.youtube.com/")
             .post(payload.toString().toRequestBody("application/json".toMediaType()))
 
+        if (cfg.isWebClient) {
+            reqBuilder.header("Origin", "https://www.youtube.com")
+            reqBuilder.header("Referer", "https://www.youtube.com/")
+        }
         if (!visitorData.isNullOrBlank()) {
             reqBuilder.header("X-Goog-Visitor-Id", visitorData)
         }
@@ -558,12 +591,13 @@ class MediaExtractorService {
 
             val streamingData = root.optJSONObject("streamingData") ?: return null
             val formats = mutableListOf<VideoFormatOption>()
+            val webReferer = if (cfg.isWebClient) "https://www.youtube.com/" else null
 
             val muxedArray = streamingData.optJSONArray("formats") ?: JSONArray()
             for (i in 0 until muxedArray.length()) {
                 val item = muxedArray.getJSONObject(i)
                 val streamUrl = item.optString("url")
-                if (streamUrl.isBlank()) continue
+                if (streamUrl.isBlank() || !isHostResolvable(streamUrl)) continue
                 val mime = item.optString("mimeType").substringBefore(";").ifBlank { "video/mp4" }
                 val qualityLabel = item.optString("qualityLabel").ifBlank { "MP4" }
                 val contentLength = item.optString("contentLength").toLongOrNull()
@@ -576,7 +610,7 @@ class MediaExtractorService {
                     extension = ext,
                     downloadUrl = streamUrl,
                     fileSizeBytes = contentLength,
-                    referer = "https://www.youtube.com/",
+                    referer = webReferer,
                     userAgent = cfg.userAgent
                 )
             }
@@ -589,7 +623,7 @@ class MediaExtractorService {
                 val mimeFull = item.optString("mimeType")
                 if (!mimeFull.startsWith("audio/")) continue
                 val streamUrl = item.optString("url")
-                if (streamUrl.isBlank()) continue
+                if (streamUrl.isBlank() || !isHostResolvable(streamUrl)) continue
                 val bitrate = item.optInt("bitrate", 0)
                 if (bitrate >= bestAudioBitrate) {
                     bestAudioBitrate = bitrate
@@ -605,7 +639,7 @@ class MediaExtractorService {
                         downloadUrl = streamUrl,
                         fileSizeBytes = item.optString("contentLength").toLongOrNull(),
                         isAudioOnly = true,
-                        referer = "https://www.youtube.com/",
+                        referer = webReferer,
                         userAgent = cfg.userAgent
                     )
                 }
@@ -656,7 +690,7 @@ class MediaExtractorService {
                 val item = videos.getJSONObject(i)
                 if (item.optBoolean("videoOnly", true)) continue
                 val streamUrl = item.optString("url")
-                if (streamUrl.isBlank()) continue
+                if (streamUrl.isBlank() || !isHostResolvable(streamUrl)) continue
                 val quality = item.optString("quality").ifBlank { "MP4" }
                 val mime = item.optString("mimeType").substringBefore(";").ifBlank { "video/mp4" }
                 val ext = if (mime.contains("webm")) "webm" else "mp4"
@@ -673,26 +707,26 @@ class MediaExtractorService {
             }
 
             val audios = root.optJSONArray("audioStreams") ?: JSONArray()
-            if (audios.length() > 0) {
-                val audioItem = audios.getJSONObject(0)
+            for (i in 0 until audios.length()) {
+                val audioItem = audios.getJSONObject(i)
                 val streamUrl = audioItem.optString("url")
-                if (streamUrl.isNotBlank()) {
-                    val mime = audioItem.optString("mimeType").substringBefore(";")
-                        .ifBlank { "audio/mp4" }
-                    val ext = if (mime.contains("mp4")) "m4a" else "webm"
-                    val quality = audioItem.optString("quality").ifBlank { "Audio" }
-                    formats += VideoFormatOption(
-                        id = "piped_a_0",
-                        label = "Audio Saja ($quality)",
-                        qualityBadge = quality,
-                        mimeType = mime,
-                        extension = ext,
-                        downloadUrl = streamUrl,
-                        fileSizeBytes = audioItem.optLong("contentLength", -1L).takeIf { it > 0 },
-                        isAudioOnly = true,
-                        userAgent = DESKTOP_UA
-                    )
-                }
+                if (streamUrl.isBlank() || !isHostResolvable(streamUrl)) continue
+                val mime = audioItem.optString("mimeType").substringBefore(";")
+                    .ifBlank { "audio/mp4" }
+                val ext = if (mime.contains("mp4")) "m4a" else "webm"
+                val quality = audioItem.optString("quality").ifBlank { "Audio" }
+                formats += VideoFormatOption(
+                    id = "piped_a_$i",
+                    label = "Audio Saja ($quality)",
+                    qualityBadge = quality,
+                    mimeType = mime,
+                    extension = ext,
+                    downloadUrl = streamUrl,
+                    fileSizeBytes = audioItem.optLong("contentLength", -1L).takeIf { it > 0 },
+                    isAudioOnly = true,
+                    userAgent = DESKTOP_UA
+                )
+                break
             }
 
             if (formats.isEmpty()) return null
@@ -730,8 +764,10 @@ class MediaExtractorService {
             val formatStreams = root.optJSONArray("formatStreams") ?: JSONArray()
             for (i in 0 until formatStreams.length()) {
                 val item = formatStreams.getJSONObject(i)
-                val streamUrl = item.optString("url")
-                if (streamUrl.isBlank()) continue
+                val rawStreamUrl = item.optString("url")
+                if (rawStreamUrl.isBlank()) continue
+                val streamUrl = if (rawStreamUrl.startsWith("/")) "$baseUrl$rawStreamUrl" else rawStreamUrl
+                if (!isHostResolvable(streamUrl)) continue
                 val quality = item.optString("qualityLabel").ifBlank { "MP4" }
                 val container = item.optString("container").ifBlank { "mp4" }
                 formats += VideoFormatOption(
@@ -811,7 +847,7 @@ class MediaExtractorService {
                 .optJSONObject("data")
                 ?.optJSONObject("shortcode_media") ?: return null
             val videoUrl = media.optString("video_url")
-            if (videoUrl.isBlank()) return null
+            if (videoUrl.isBlank() || !isHostResolvable(videoUrl)) return null
 
             val thumb = media.optString("display_url").ifBlank { null }
             val owner = media.optJSONObject("owner")?.optString("username")
@@ -868,14 +904,23 @@ class MediaExtractorService {
             for (pattern in videoUrlPatterns) {
                 pattern.findAll(html).forEach { match ->
                     val cleaned = unescapeJsonUrl(match.groupValues[1])
-                    if (cleaned.startsWith("http")) videoUrls += cleaned
+                    if (cleaned.startsWith("http") && isHostResolvable(cleaned)) videoUrls += cleaned
                 }
             }
 
-            extractMetaContent(html, "og:video:secure_url")?.let { videoUrls += unescapeHtml(it) }
-            extractMetaContent(html, "og:video")?.let { videoUrls += unescapeHtml(it) }
+            extractMetaContent(html, "og:video:secure_url")?.let {
+                val u = unescapeHtml(it)
+                if (isHostResolvable(u)) videoUrls += u
+            }
+            extractMetaContent(html, "og:video")?.let {
+                val u = unescapeHtml(it)
+                if (isHostResolvable(u)) videoUrls += u
+            }
             Regex("""<video[^>]*src=["']([^"']+)["']""", RegexOption.IGNORE_CASE)
-                .find(html)?.groupValues?.getOrNull(1)?.let { videoUrls += unescapeHtml(it) }
+                .find(html)?.groupValues?.getOrNull(1)?.let {
+                    val u = unescapeHtml(it)
+                    if (isHostResolvable(u)) videoUrls += u
+                }
 
             if (videoUrls.isEmpty()) return null
 
